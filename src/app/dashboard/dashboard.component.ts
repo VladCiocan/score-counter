@@ -16,7 +16,7 @@ import { SelectModule } from 'primeng/select';
 // Services
 import { AuthService } from '../services/auth.service';
 import { SessionService, SessionOptionInput } from '../services/session.service';
-import { Session, SessionOption } from '../models/session.model';
+import { Session, SessionEvent, SessionOption } from '../models/session.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -82,6 +82,16 @@ import { Session, SessionOption } from '../models/session.model';
                 name="outcome-{{ i }}"
                 styleClass="dropdown"
               ></p-select>
+              <button
+                pButton
+                type="button"
+                icon="pi pi-trash"
+                class="p-button-text"
+                severity="danger"
+                (click)="removeField(i)"
+                [disabled]="newFields.length === 1"
+                aria-label="Șterge câmp"
+              ></button>
             </div>
             <button pButton type="button" icon="pi pi-plus" label="Adaugă câmp" class="p-button-text" (click)="addField()"></button>
           </div>
@@ -190,9 +200,52 @@ import { Session, SessionOption } from '../models/session.model';
               </ng-template>
             </p-table>
 
+            <p-table [value]="session.events" responsiveLayout="scroll" *ngIf="session.events.length">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>Înregistrare</th>
+                  <th>Tip</th>
+                  <th>Moment</th>
+                  <th></th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-event>
+                <tr>
+                  <td>{{ event.optionLabel }}</td>
+                  <td>
+                    <p-tag
+                      [value]="event.outcome === 'victory' ? 'Victorie' : 'Înfrângere'"
+                      [severity]="event.outcome === 'victory' ? 'success' : 'danger'"
+                    ></p-tag>
+                  </td>
+                  <td>{{ event.timestamp | date: 'short' }}</td>
+                  <td class="actions-cell">
+                    <button
+                      pButton
+                      type="button"
+                      icon="pi pi-trash"
+                      class="p-button-text"
+                      severity="danger"
+                      (click)="removeEvent(event)"
+                      aria-label="Șterge înregistrare"
+                    ></button>
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+
             <div class="footer-bar">
               <div class="muted">Gestionează sesiunile și deconectează-te oricând.</div>
               <div class="actions">
+                <button
+                  pButton
+                  label="Șterge sesiunea"
+                  icon="pi pi-trash"
+                  class="p-button-outlined"
+                  severity="danger"
+                  (click)="deleteSession()"
+                  [disabled]="!session"
+                ></button>
                 <button pButton label="Închide sesiunea" icon="pi pi-stop" class="p-button-outlined" (click)="endSession()" [disabled]="!session.isActive"></button>
                 <button pButton label="Logout" icon="pi pi-sign-out" class="p-button-text" (click)="onLogout()"></button>
               </div>
@@ -267,8 +320,9 @@ import { Session, SessionOption } from '../models/session.model';
 
       .field-row {
         display: grid;
-        grid-template-columns: 1fr 200px;
+        grid-template-columns: 1fr 200px 48px;
         gap: 0.75rem;
+        align-items: center;
       }
 
       .dropdown {
@@ -379,6 +433,10 @@ import { Session, SessionOption } from '../models/session.model';
         flex-wrap: wrap;
       }
 
+      .actions-cell {
+        text-align: right;
+      }
+
       @media (max-width: 1024px) {
         .layout {
           grid-template-columns: 1fr;
@@ -388,6 +446,10 @@ import { Session, SessionOption } from '../models/session.model';
       @media (max-width: 640px) {
         .field-row {
           grid-template-columns: 1fr;
+        }
+
+        .field-row button {
+          justify-self: start;
         }
       }
     `
@@ -421,6 +483,12 @@ export class DashboardComponent implements OnInit {
 
   addField() {
     this.newFields.push({ label: '', outcome: 'victory' });
+  }
+
+  removeField(index: number) {
+    if (this.newFields.length > 1) {
+      this.newFields.splice(index, 1);
+    }
   }
 
   loadSessions() {
@@ -460,11 +528,27 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  deleteSession() {
+    if (this.selectedSession && this.sessionService.deleteSession(this.selectedSession.id)) {
+      this.messageService.add({ severity: 'info', summary: 'Sesiune', detail: 'Sesiune ștearsă.' });
+      this.loadSessions();
+    }
+  }
+
   recordOutcome(option: SessionOption) {
     if (this.activeSession) {
       this.sessionService.addOutcome(this.activeSession.id, option.label);
       this.loadSessions();
       this.messageService.add({ severity: 'success', summary: 'Înregistrat', detail: `${option.label} adăugată` });
+    }
+  }
+
+  removeEvent(event: SessionEvent) {
+    if (!this.selectedSession) return;
+    const removed = this.sessionService.removeEvent(this.selectedSession.id, event.timestamp);
+    if (removed) {
+      this.messageService.add({ severity: 'warn', summary: 'Șters', detail: 'Înregistrare eliminată.' });
+      this.loadSessions();
     }
   }
 

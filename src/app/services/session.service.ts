@@ -63,6 +63,19 @@ export class SessionService {
     }
   }
 
+  deleteSession(sessionId: string): boolean {
+    const currentUserId = this.getCurrentUserId();
+    const sessions = this.getSessions();
+    const filteredSessions = sessions.filter(session => !(session.id === sessionId && session.userId === currentUserId));
+
+    if (filteredSessions.length !== sessions.length) {
+      this.saveAllSessions(filteredSessions);
+      return true;
+    }
+
+    return false;
+  }
+
   addOutcome(sessionId: string, optionLabel: string): void {
     const sessions = this.getSessions();
     const session = sessions.find(s => s.id === sessionId);
@@ -79,6 +92,27 @@ export class SessionService {
         this.saveAllSessions(sessions);
       }
     }
+  }
+
+  removeEvent(sessionId: string, timestamp: string): boolean {
+    const sessions = this.getSessions();
+    const session = sessions.find(s => s.id === sessionId && s.userId === this.getCurrentUserId());
+    if (!session) return false;
+
+    const eventIndex = session.events.findIndex(e => e.timestamp === timestamp);
+    if (eventIndex === -1) return false;
+
+    const [removedEvent] = session.events.splice(eventIndex, 1);
+    const option = session.options.find(
+      o => o.label === removedEvent.optionLabel && o.outcome === removedEvent.outcome
+    );
+
+    if (option && option.count > 0) {
+      option.count -= 1;
+    }
+
+    this.saveAllSessions(sessions);
+    return true;
   }
 
   getActiveSession(): Session | null {
