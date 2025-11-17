@@ -17,9 +17,18 @@ export interface SessionOptionInput {
   providedIn: 'root'
 })
 export class SessionService {
-  private sessionsKey = 'sessions';
+  private sessionsKey = 'sessions_v2';
+  private legacySessionsKey = 'sessions';
+  private sessionEventsPrefix = 'session_events_';
+  private initialized = false;
 
   constructor() {}
+
+  private ensureInitialized() {
+    if (this.initialized) return;
+    this.migrateLegacySessions();
+    this.initialized = true;
+  }
 
   getCurrentUserId(): string {
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -50,6 +59,7 @@ export class SessionService {
 
     sessions.push(session);
     this.saveAllSessions(sessions);
+    this.persistSessionEvents(session.id, []);
     return session;
   }
 
@@ -70,6 +80,7 @@ export class SessionService {
 
     if (filteredSessions.length !== sessions.length) {
       this.saveAllSessions(filteredSessions);
+      this.removeSessionEvents(sessionId);
       return true;
     }
 
@@ -88,7 +99,10 @@ export class SessionService {
           outcome: option.outcome,
           timestamp: new Date().toISOString()
         };
-        session.events.push(event);
+        const events = this.getSessionEvents(session.id);
+        events.push(event);
+        session.events = events;
+        this.persistSessionEvents(session.id, events);
         this.saveAllSessions(sessions);
       }
     }
@@ -103,6 +117,7 @@ export class SessionService {
     if (eventIndex === -1) return false;
 
     const [removedEvent] = session.events.splice(eventIndex, 1);
+    this.persistSessionEvents(session.id, session.events);
     const option = session.options.find(
       o => o.label === removedEvent.optionLabel && o.outcome === removedEvent.outcome
     );
@@ -140,6 +155,7 @@ export class SessionService {
   }
 
   private getSessions(): Session[] {
+    this.ensureInitialized();
     const sessions = localStorage.getItem(this.sessionsKey);
     if (!sessions) return [];
 
@@ -150,7 +166,7 @@ export class SessionService {
         startDate: session.startDate,
         endDate: session.endDate,
         options: session.options || [],
-        events: session.events || []
+        events: this.getSessionEvents(session.id)
       }));
     } catch (error) {
       console.error('Failed to parse sessions', error);
@@ -159,7 +175,47 @@ export class SessionService {
   }
 
   private saveAllSessions(sessions: Session[]): void {
-    localStorage.setItem(this.sessionsKey, JSON.stringify(sessions));
+    const sessionsWithoutEvents = sessions.map(({ events, ...rest }) => ({ ...rest }));
+    localStorage.setItem(this.sessionsKey, JSON.stringify(sessionsWithoutEvents));
+  }
+
+  private getSessionEvents(sessionId: string): SessionEvent[] {
+    const eventsStr = localStorage.getItem(`${this.sessionEventsPrefix}${sessionId}`);
+    if (!eventsStr) return [];
+    try {
+      return JSON.parse(eventsStr) as SessionEvent[];
+    } catch (error) {
+      console.error('Failed to parse session events', error);
+      return [];
+    }
+  }
+
+  private persistSessionEvents(sessionId: string, events: SessionEvent[]): void {
+    localStorage.setItem(`${this.sessionEventsPrefix}${sessionId}`, JSON.stringify(events));
+  }
+
+  private removeSessionEvents(sessionId: string): void {
+    localStorage.removeItem(`${this.sessionEventsPrefix}${sessionId}`);
+  }
+
+  private migrateLegacySessions(): void {
+    const legacy = localStorage.getItem(this.legacySessionsKey);
+    if (!legacy) return;
+
+    try {
+      const parsed = JSON.parse(legacy) as Session[];
+      parsed.forEach(session => {
+        if (!localStorage.getItem(`${this.sessionEventsPrefix}${session.id}`)) {
+          this.persistSessionEvents(session.id, session.events || []);
+        }
+      });
+
+      const sessionsWithoutEvents = parsed.map(({ events, ...rest }) => ({ ...rest }));
+      localStorage.setItem(this.sessionsKey, JSON.stringify(sessionsWithoutEvents));
+      localStorage.removeItem(this.legacySessionsKey);
+    } catch (error) {
+      console.error('Failed to migrate legacy sessions', error);
+    }
   }
 
   private generateId(): string {
