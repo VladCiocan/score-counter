@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
-import {DatePipe, NgIf} from '@angular/common';
+import { DatePipe, DecimalPipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 // PrimeNG standalone
@@ -10,10 +10,11 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { CardModule } from 'primeng/card';
 import { TableModule } from 'primeng/table';
 import { ToastModule } from 'primeng/toast';
+import { TagModule } from 'primeng/tag';
 
 // Services
 import { AuthService } from '../services/auth.service';
-import { SessionService } from '../services/session.service';
+import { SessionService, SessionStats } from '../services/session.service';
 import { Session } from '../models/session.model';
 
 @Component({
@@ -27,103 +28,310 @@ import { Session } from '../models/session.model';
     ToastModule,
     FormsModule,
     DatePipe,
-    NgIf
+    DecimalPipe,
+    NgIf,
+    NgFor,
+    TagModule
   ],
   template: `
     <p-toast></p-toast>
-    <div class="p-4">
-      <div class="flex justify-content-between align-items-center mb-4">
-        <h1>Dashboard</h1>
+    <div class="dashboard">
+      <div class="welcome">
         <div>
-          <span class="mr-3">Hello, {{ auth.getCurrentUser()?.username }}!</span>
-          <button pButton icon="pi pi-sign-out" (click)="onLogout()" class="p-button-text"></button>
-        </div>
-      </div>
-
-      <!-- Session Control -->
-      <div class="card mb-4">
-        <h3>Session Control</h3>
-        <div class="flex gap-2">
-          <button pButton label="Start New Session" (click)="startSession()" [disabled]="!!activeSession"></button>
-          <button pButton label="End Session" (click)="endSession()" [disabled]="!activeSession"></button>
-        </div>
-      </div>
-
-      <!-- Add Score -->
-      <div class="card mb-4" *ngIf="activeSession">
-        <h3>Add Score to Current Session</h3>
-        <div class="flex gap-2 align-items-end">
-          <p-inputNumber [(ngModel)]="newScore" placeholder="Score" mode="decimal" class="w-15rem"></p-inputNumber>
-          <button pButton icon="pi pi-plus" label="Add" (click)="addScore()" [disabled]="newScore === null"></button>
-        </div>
-        <ul class="mt-3">
-          <li *ngFor="let s of activeSession.scores; let i = index">
-            {{ i + 1 }}. {{ s }}
-          </li>
-        </ul>
-      </div>
-
-      <!-- Stats -->
-      <div class="grid">
-        <div class="col-12 md:col-6">
-          <div class="card">
-            <h3>Current Session Stats</h3>
-            <div *ngIf="activeSession; else noActive">
-              <p><strong>Total:</strong> {{ stats.total }}</p>
-              <p><strong>Average:</strong> {{ stats.avg }}</p>
-              <p><strong>Max:</strong> {{ stats.max }}</p>
-              <p><strong>Min:</strong> {{ stats.min }}</p>
-              <p><strong>Entries:</strong> {{ stats.total }}</p>
-            </div>
-            <ng-template #noActive>
-              <p>No active session.</p>
-            </ng-template>
+          <p class="eyebrow">Bun venit, {{ auth.getCurrentUser()?.username }}!</p>
+          <h2>Controlează-ți sesiunile și urmărește progresul.</h2>
+          <p class="muted">
+            Pornește o sesiune nouă, adaugă puncte și analizează istoricul într-un tabel clar și modern.
+          </p>
+          <div class="actions">
+            <button
+              pButton
+              label="Start session"
+              icon="pi pi-play"
+              (click)="startSession()"
+              [disabled]="!!activeSession"
+            ></button>
+            <button
+              pButton
+              label="Închide sesiunea"
+              icon="pi pi-stop"
+              class="p-button-outlined"
+              (click)="endSession()"
+              [disabled]="!activeSession"
+            ></button>
           </div>
         </div>
+        <div class="session-card" *ngIf="activeSession; else noActive">
+          <div class="session-header">
+            <div>
+              <p class="eyebrow">Sesiune activă</p>
+              <h3>#{{ activeSession!.id.substring(0, 6) }}</h3>
+            </div>
+            <p-tag value="Live" severity="success"></p-tag>
+          </div>
+          <div class="stats-grid">
+            <div>
+              <p class="label">Total</p>
+              <p class="value">{{ stats.total }}</p>
+            </div>
+            <div>
+              <p class="label">Medie</p>
+              <p class="value">{{ stats.avg | number: '1.0-2' }}</p>
+            </div>
+            <div>
+              <p class="label">Max</p>
+              <p class="value">{{ stats.max }}</p>
+            </div>
+            <div>
+              <p class="label">Înregistrări</p>
+              <p class="value">{{ stats.count }}</p>
+            </div>
+          </div>
+        </div>
+        <ng-template #noActive>
+          <div class="session-card empty">
+            <p class="muted">Nu există o sesiune activă. Pornește una nouă pentru a începe să numeri.</p>
+          </div>
+        </ng-template>
+      </div>
 
-        <div class="col-12">
-          <div class="card">
-            <h3>Session History</h3>
+      <div class="layout">
+        <div class="left">
+          <p-card header="Adaugă scoruri" styleClass="card-elevated" *ngIf="activeSession">
+            <div class="field">
+              <label for="score">Valoare</label>
+              <p-inputNumber
+                id="score"
+                [(ngModel)]="newScore"
+                placeholder="Ex. 10"
+                inputId="score"
+                [minFractionDigits]="0"
+                class="w-full"
+              ></p-inputNumber>
+            </div>
+            <button
+              pButton
+              type="button"
+              label="Adaugă în sesiune"
+              icon="pi pi-plus"
+              class="w-full mt-3"
+              (click)="addScore()"
+              [disabled]="newScore === null"
+            ></button>
+
+            <ul class="score-list" *ngIf="(activeSession?.scores?.length || 0) > 0">
+              <li *ngFor="let s of activeSession!.scores; let i = index">
+                <span>#{{ i + 1 }}</span>
+                <strong>{{ s }}</strong>
+              </li>
+            </ul>
+          </p-card>
+
+          <p-card *ngIf="!activeSession" header="Începe o sesiune" styleClass="card-elevated">
+            <p class="muted">Pornește o sesiune pentru a începe să adaugi scoruri.</p>
+            <button pButton label="Start session" icon="pi pi-play" class="mt-2" (click)="startSession()"></button>
+          </p-card>
+        </div>
+
+        <div class="right">
+          <p-card header="Istoric sesiuni" styleClass="card-elevated">
             <p-table [value]="sessions" responsiveLayout="scroll">
               <ng-template pTemplate="header">
                 <tr>
                   <th>ID</th>
                   <th>Start</th>
-                  <th>End</th>
-                  <th>Scores</th>
+                  <th>Final</th>
+                  <th>Scoruri</th>
                   <th>Total</th>
-                  <th>Avg</th>
+                  <th>Medie</th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-session>
                 <tr>
-                  <td>{{ session.id.substring(0,6) }}</td>
-                  <td>{{ session.startDate | date:'short' }}</td>
-                  <td>{{ session.endDate ? (session.endDate | date:'short') : '—' }}</td>
+                  <td class="id">{{ session.id.substring(0, 6) }}</td>
+                  <td>{{ session.startDate | date: 'short' }}</td>
+                  <td>{{ session.endDate ? (session.endDate | date: 'short') : '—' }}</td>
                   <td>{{ session.scores.join(', ') || '—' }}</td>
                   <td>{{ getStats(session).total }}</td>
-                  <td>{{ getStats(session).avg }}</td>
+                  <td>{{ getStats(session).avg | number: '1.0-2' }}</td>
                 </tr>
               </ng-template>
             </p-table>
-          </div>
+          </p-card>
         </div>
+      </div>
+
+      <div class="footer-bar">
+        <div class="muted">Gestionează sesiunile în siguranță și deconectează-te oricând.</div>
+        <button pButton label="Logout" icon="pi pi-sign-out" class="p-button-text" (click)="onLogout()"></button>
       </div>
     </div>
   `,
+  styles: [
+    `
+      .dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .welcome {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1.25rem;
+        align-items: stretch;
+      }
+
+      .eyebrow {
+        font-size: 0.85rem;
+        letter-spacing: 0.02em;
+        color: var(--primary-strong);
+        font-weight: 700;
+        margin: 0 0 0.35rem;
+      }
+
+      .welcome h2 {
+        margin: 0 0 0.5rem;
+        font-size: 1.9rem;
+      }
+
+      .muted {
+        color: var(--ink-subtle);
+        margin: 0;
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .session-card {
+        background: var(--surface-muted);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 18px;
+        padding: 1.25rem;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1.25rem;
+      }
+
+      .left,
+      .right {
+        width: 100%;
+      }
+
+      .session-card.empty {
+        display: grid;
+        place-items: center;
+        min-height: 180px;
+        text-align: center;
+      }
+
+      .session-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .session-header h3 {
+        margin: 0.1rem 0 0;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .label {
+        margin: 0;
+        color: var(--ink-subtle);
+        font-size: 0.9rem;
+      }
+
+      .value {
+        margin: 0.2rem 0 0;
+        font-weight: 700;
+        font-size: 1.4rem;
+      }
+
+      .p-card.card-elevated {
+        width: 100%;
+      }
+
+      .w-full {
+        width: 100%;
+      }
+
+      .mt-3 {
+        margin-top: 0.75rem;
+      }
+
+      .mt-2 {
+        margin-top: 0.5rem;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-weight: 600;
+      }
+
+      .score-list {
+        list-style: none;
+        padding: 0;
+        margin: 1rem 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .score-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0.85rem;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        font-weight: 600;
+      }
+
+      .id {
+        font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+      }
+
+      .footer-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.85rem 1rem;
+        background: var(--surface-muted);
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      @media (max-width: 768px) {
+        .footer-bar {
+          flex-direction: column;
+          gap: 0.5rem;
+          align-items: flex-start;
+        }
+      }
+    `
+  ],
   providers: [MessageService]
 })
 export class DashboardComponent implements OnInit {
   activeSession: Session | null = null;
   sessions: Session[] = [];
   newScore: number | null = null;
-  stats: { total: number; avg: number; max: number; min: number } | {
-    total: number;
-    avg: string;
-    max: number;
-    min: number;
-    count: number
-  } = { total: 0, avg: 0, max: 0, min: 0, count: 0 };
+  stats: SessionStats = { total: 0, avg: 0, max: 0, min: 0, count: 0 };
 
   constructor(
     public auth: AuthService,
@@ -139,22 +347,22 @@ export class DashboardComponent implements OnInit {
   loadSessions() {
     this.sessions = this.sessionService.getUserSessions();
     this.activeSession = this.sessionService.getActiveSession();
-    if (this.activeSession) {
-      this.stats = this.sessionService.getSessionStats(this.activeSession);
-    }
+    this.stats = this.activeSession
+      ? this.sessionService.getSessionStats(this.activeSession)
+      : { total: 0, avg: 0, max: 0, min: 0, count: 0 };
   }
 
   startSession() {
     this.sessionService.startSession();
     this.loadSessions();
-    this.messageService.add({ severity: 'success', summary: 'Session', detail: 'New session started!' });
+    this.messageService.add({ severity: 'success', summary: 'Sesiune', detail: 'Sesiune pornită!' });
   }
 
   endSession() {
     if (this.activeSession) {
       this.sessionService.endSession(this.activeSession.id);
       this.loadSessions();
-      this.messageService.add({ severity: 'info', summary: 'Session', detail: 'Session ended.' });
+      this.messageService.add({ severity: 'info', summary: 'Sesiune', detail: 'Sesiune încheiată.' });
     }
   }
 
@@ -162,7 +370,8 @@ export class DashboardComponent implements OnInit {
     if (this.activeSession && this.newScore !== null) {
       this.sessionService.addScore(this.activeSession.id, this.newScore);
       this.newScore = null;
-      this.loadSessions(); // refresh stats
+      this.loadSessions();
+      this.messageService.add({ severity: 'success', summary: 'Scor', detail: 'Scor adăugat!' });
     }
   }
 
