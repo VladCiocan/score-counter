@@ -129,6 +129,7 @@ export class LoginComponent {
 
   onLogin() {
     if (this.auth.login(this.username, this.password)) {
+      this.messageService.add({ severity: 'success', summary: 'Succes', detail: 'Autentificare reușită' });
       this.router.navigate(['/dashboard']);
     } else {
       this.messageService.add({ severity: 'error', summary: 'Eroare', detail: 'Date incorecte' });

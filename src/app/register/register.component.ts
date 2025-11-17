@@ -129,8 +129,8 @@ export class RegisterComponent {
 
   onRegister() {
     if (this.auth.register({ username: this.username, password: this.password })) {
-      this.messageService.add({ severity: 'success', summary: 'Succes', detail: 'Cont creat! Autentifică-te.' });
-      this.router.navigate(['/login']);
+      this.messageService.add({ severity: 'success', summary: 'Succes', detail: 'Cont creat și autentificat!' });
+      this.router.navigate(['/dashboard']);
     } else {
       this.messageService.add({ severity: 'error', summary: 'Eroare', detail: 'Utilizator existent' });
     }

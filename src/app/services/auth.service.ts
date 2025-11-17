@@ -16,6 +16,7 @@ export class AuthService {
 
     users.push(user);
     localStorage.setItem(this.usersKey, JSON.stringify(users));
+    localStorage.setItem(this.currentUserKey, JSON.stringify(user));
     return true;
   }
 
@@ -36,6 +37,10 @@ export class AuthService {
   getCurrentUser(): User | null {
     const userStr = localStorage.getItem(this.currentUserKey);
     return userStr ? JSON.parse(userStr) : null;
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getCurrentUser();
   }
 
   private getUsers(): User[] {

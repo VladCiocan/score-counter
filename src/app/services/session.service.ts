@@ -1,12 +1,16 @@
 import { Injectable } from '@angular/core';
-import { Session } from '../models/session.model';
+import { Session, SessionEvent, SessionOption } from '../models/session.model';
 
 export interface SessionStats {
   total: number;
-  avg: number;
-  max: number;
-  min: number;
-  count: number;
+  victories: number;
+  defeats: number;
+  balance: number;
+}
+
+export interface SessionOptionInput {
+  label: string;
+  outcome: 'victory' | 'defeat';
 }
 
 @Injectable({
@@ -22,15 +26,30 @@ export class SessionService {
     return user?.username || '';
   }
 
-  startSession(): Session {
+  startSession(name: string, optionInputs: SessionOptionInput[]): Session {
+    const options: SessionOption[] = optionInputs
+      .filter(opt => !!opt.label)
+      .map(opt => ({ ...opt, count: 0 }));
+
     const session: Session = {
       id: this.generateId(),
       userId: this.getCurrentUserId(),
-      startDate: new Date(),
-      scores: [],
+      name,
+      startDate: new Date().toISOString(),
+      options,
+      events: [],
       isActive: true
     };
-    this.saveSession(session);
+
+    const sessions = this.getSessions();
+    const existingActive = sessions.find(s => s.userId === session.userId && s.isActive);
+    if (existingActive) {
+      existingActive.isActive = false;
+      existingActive.endDate = new Date().toISOString();
+    }
+
+    sessions.push(session);
+    this.saveAllSessions(sessions);
     return session;
   }
 
@@ -39,17 +58,26 @@ export class SessionService {
     const session = sessions.find(s => s.id === sessionId);
     if (session && session.isActive) {
       session.isActive = false;
-      session.endDate = new Date();
+      session.endDate = new Date().toISOString();
       this.saveAllSessions(sessions);
     }
   }
 
-  addScore(sessionId: string, score: number): void {
+  addOutcome(sessionId: string, optionLabel: string): void {
     const sessions = this.getSessions();
     const session = sessions.find(s => s.id === sessionId);
     if (session && session.isActive) {
-      session.scores.push(score);
-      this.saveAllSessions(sessions);
+      const option = session.options.find(o => o.label === optionLabel);
+      if (option) {
+        option.count += 1;
+        const event: SessionEvent = {
+          optionLabel: option.label,
+          outcome: option.outcome,
+          timestamp: new Date().toISOString()
+        };
+        session.events.push(event);
+        this.saveAllSessions(sessions);
+      }
     }
   }
 
@@ -62,34 +90,42 @@ export class SessionService {
   }
 
   getSessionStats(session: Session): SessionStats {
-    const scores = session.scores;
-    if (scores.length === 0) {
-      return { total: 0, avg: 0, max: 0, min: 0, count: 0 };
-    }
+    const victories = session.options
+      .filter(o => o.outcome === 'victory')
+      .reduce((sum, option) => sum + option.count, 0);
+    const defeats = session.options
+      .filter(o => o.outcome === 'defeat')
+      .reduce((sum, option) => sum + option.count, 0);
 
-    const total = scores.reduce((a, b) => a + b, 0);
     return {
-      total,
-      avg: parseFloat((total / scores.length).toFixed(2)),
-      max: Math.max(...scores),
-      min: Math.min(...scores),
-      count: scores.length
+      total: victories + defeats,
+      victories,
+      defeats,
+      balance: victories - defeats
     };
   }
 
   private getSessions(): Session[] {
     const sessions = localStorage.getItem(this.sessionsKey);
-    return sessions ? JSON.parse(sessions) : [];
+    if (!sessions) return [];
+
+    try {
+      const parsed = JSON.parse(sessions) as Session[];
+      return parsed.map(session => ({
+        ...session,
+        startDate: session.startDate,
+        endDate: session.endDate,
+        options: session.options || [],
+        events: session.events || []
+      }));
+    } catch (error) {
+      console.error('Failed to parse sessions', error);
+      return [];
+    }
   }
 
   private saveAllSessions(sessions: Session[]): void {
     localStorage.setItem(this.sessionsKey, JSON.stringify(sessions));
-  }
-
-  private saveSession(session: Session): void {
-    const sessions = this.getSessions();
-    sessions.push(session);
-    this.saveAllSessions(sessions);
   }
 
   private generateId(): string {
