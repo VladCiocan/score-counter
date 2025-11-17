@@ -1,6 +1,14 @@
 import { Injectable } from '@angular/core';
 import { Session } from '../models/session.model';
 
+export interface SessionStats {
+  total: number;
+  avg: number;
+  max: number;
+  min: number;
+  count: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -53,13 +61,16 @@ export class SessionService {
     return this.getSessions().filter(s => s.userId === this.getCurrentUserId());
   }
 
-  getSessionStats(session: Session) {
+  getSessionStats(session: Session): SessionStats {
     const scores = session.scores;
-    if (scores.length === 0) return { total: 0, avg: 0, max: 0, min: 0 };
+    if (scores.length === 0) {
+      return { total: 0, avg: 0, max: 0, min: 0, count: 0 };
+    }
 
+    const total = scores.reduce((a, b) => a + b, 0);
     return {
-      total: scores.reduce((a, b) => a + b, 0),
-      avg: (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2),
+      total,
+      avg: parseFloat((total / scores.length).toFixed(2)),
       max: Math.max(...scores),
       min: Math.min(...scores),
       count: scores.length
@@ -82,6 +93,6 @@ export class SessionService {
   }
 
   private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
 }
