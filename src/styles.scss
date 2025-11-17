@@ -1,3 +1,4 @@
+@import 'primeflex/primeflex.css';
 @import 'primeicons/primeicons.css';
 
 :root {
@@ -29,6 +30,78 @@ body {
 
 a {
   color: var(--primary);
+}
+
+.p-component {
+  font-family: inherit;
+}
+
+.p-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.p-select.p-focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+}
+
+.p-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+  color: var(--ink);
+}
+
+.p-select-label {
+  flex: 1;
+  color: var(--ink);
+}
+
+.p-select-dropdown {
+  display: flex;
+  align-items: center;
+  color: var(--ink-subtle);
+}
+
+.p-select-overlay {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 0.35rem 0;
+}
+
+.p-select-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.p-select-option {
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink);
+}
+
+.p-select-option.p-highlight,
+.p-select-option:hover {
+  background: var(--surface-muted);
 }
 
 .p-card {
@@ -103,6 +176,13 @@ a {
   border-radius: 999px;
   padding: 0.25rem 0.75rem;
   font-weight: 700;
+}
+
+.p-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1100;
 }
 
 .p-toast-message {
